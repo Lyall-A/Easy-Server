@@ -25,7 +25,10 @@ class EasyServer {
                 if (filePath !== null) break;
             }
 
-            if (filePath === null) return res.sendStatus(404);
+            if (filePath === null) {
+                console.log(`File not found: ${urlPath}`);
+                return res.sendStatus(404);
+            }
             
             const stats = fs.statSync(filePath);
             if (stats.isDirectory()) return res.sendStatus(404);
