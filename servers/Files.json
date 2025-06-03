@@ -1,4 +1,4 @@
 {
     "port": 6701,
-    "path": "/media/public"
+    "paths": ["/media/public", "/media/files", "/media/stuff"]
 }

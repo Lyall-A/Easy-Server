@@ -8,16 +8,24 @@ class EasyServer {
     constructor(options = { }) {
         this.server = express();
         this.port = options.port;
-        this.path = path.resolve(options.path);
+        this.paths = options.paths?.map(i => path.resolve(i)) || [path.resolve(options.path)];
 
         this.server.disable("x-powered-by");
 
         this.server.use((req, res, next) => {
             const urlPath = decodeURIComponent(req.path);
-            const filePath = path.join(this.path, urlPath);
+            let filePath = null;
 
-            if (filePath !== this.path + urlPath) return res.sendStatus(404);
-            if (!fs.existsSync(filePath)) return res.sendStatus(404);
+            for (const currentFilePath of this.paths) {
+                filePath = path.join(currentFilePath, urlPath);
+
+                if (filePath !== currentFilePath + urlPath) filePath = null;
+                if (!fs.existsSync(filePath)) filePath = null;
+
+                if (filePath !== null) break;
+            }
+
+            if (filePath === null) return res.sendStatus(404);
             
             const stats = fs.statSync(filePath);
             if (stats.isDirectory()) return res.sendStatus(404);
@@ -29,11 +37,28 @@ class EasyServer {
         });
         
         this.server.get("/*splat", (req, res) => {
-            res.writeHead(200, {
+            let start = 0;
+            let end = res.stats.size - 1;
+
+            const headers = {
+                "Last-Modified": res.stats.mtime.toUTCString(),
+                "Accept-Ranges": "bytes",
                 "Content-Length": res.stats.size,
-                "Content-Type": getMimeType(res.filePath).mime
-            });
-            const readStream = fs.createReadStream(res.filePath);
+                "Content-Type": getMimeType(res.filePath).mime,
+            };
+
+            if (req.headers["range"]) {
+                const match = req.headers["range"].match(/bytes=(\d+)-(\d+)?/);
+                if (match) {
+                    start = Math.min(parseInt(match[1] || start), res.stats.size - 1);
+                    end = Math.max(Math.min(parseInt(match[2] || end), res.stats.size - 1), start);
+                    headers["Content-Length"] = end - start + 1;
+                    headers["Content-Range"] = `bytes ${start}-${end}/${res.stats.size}`;
+                }
+            }
+
+            res.writeHead(headers["Content-Range"] ? 206 : 200, headers);
+            const readStream = fs.createReadStream(res.filePath, { start, end });
             readStream.pipe(res);
         });
     }
