@@ -19,8 +19,6 @@ class EasyServer {
             for (const currentFilePath of this.paths) {
                 filePath = path.join(currentFilePath, urlPath);
 
-                console.log(filePath, currentFilePath + urlPath);
-
                 if (filePath !== currentFilePath + urlPath) filePath = null;
                 if (!fs.existsSync(filePath)) filePath = null;
 
